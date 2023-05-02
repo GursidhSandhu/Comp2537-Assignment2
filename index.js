@@ -41,12 +41,13 @@ const node_session_secret = process.env.NODE_SESSION_SECRET;
 // import the database object from databaseConnection.js file
 var {database} = include('databaseConnection');
 
+
 // reference to users collection in database
 const userCollection = database.db(mongodb_database).collection('users');
 
 // linking to mongoDb database
 var mongoStore = MongoStore.create({
-    mongoUrl: `mongodb+srv://${mongodb_user}:${mongodb_password}@${mongodb_host}.rye5pig.mongodb.net/test`,
+    mongoUrl: `mongodb+srv://${mongodb_user}:${mongodb_password}@${mongodb_host}/test`,
     crypto: {
         secret: mongodb_session_secret
     }
@@ -56,7 +57,7 @@ var mongoStore = MongoStore.create({
 app.use(session({
     secret: node_session_secret,
     store: mongoStore,
-    saveUnitialized: false,
+    saveUninitialized: false,
     resave: true
 }
 ));
@@ -76,6 +77,7 @@ app.get('/', (req,res) => {
         <a href='/members'><button> Go to Members Area </button></a><br>
         <a href='/logout'><button> Logout </button></a>`
         res.send(html);
+        return;
     }
 
     var html = `
@@ -108,7 +110,7 @@ app.get('/nosql-injection', async (req,res) => {
     // search for the email in users collection from database
 	const result = await userCollection.find({email: email}).project({username: 1, password: 1, _id: 1}).toArray();
 
-    res.send(`<h1>Hello ${req.session.username}</h1>`);
+   res.send(`<h1>Hello ${req.session.username}</h1>`);
 });
 
 // creating a page for users to login
@@ -144,8 +146,6 @@ app.post('/loginSubmit', async(req,res) => {
 
     // find the user in the database and store in result variable
     const result = await userCollection.find({email: email}).project({username: 1, password: 1, _id: 1}).toArray();
-
-    console.log(result);
 
     // redirect user to login if the email is not found in database 
     // if the email pops up more than once then user will be prompted to login again
@@ -197,7 +197,7 @@ app.post('/signupSubmit', async(req,res) => {
     var email = req.body.email;
     var password = req.body.password;
 
-    // validate that the following fields are completed correctly
+    //validate that the following fields are completed correctly
 	const schema = Joi.object(
 		{
 			username: Joi.string().alphanum().max(20).required(),
@@ -205,13 +205,13 @@ app.post('/signupSubmit', async(req,res) => {
 			password: Joi.string().max(20).required()
 		});
 
-	const validationResult = schema.validate({username, email, password});
+	 const validationResult = schema.validate({username, email, password});
 
     // if validation throws an error then redirect user to signup page
 	if (validationResult.error != null) {
 	   var error = validationResult.error;
        var html = `
-       <h1> ${error}. </h1>
+       <h1> ${error} </h1>
        <a href='/signup'><h2> Try again </h2></a>`;
        res.send(html);
 	   return;
@@ -221,15 +221,15 @@ app.post('/signupSubmit', async(req,res) => {
     var existingUser = await userCollection.findOne({ email: email });
 
     if (existingUser) {
-        var html = `
-            <h1> This email already exists. </h1>
-            <a href='/signup'><h2> Try again </h2></a>`;
-        res.send(html);
-        return;
+       var html = `
+           <h1> This email already exists. </h1>
+           <a href='/signup'><h2> Try again </h2></a>`;
+       res.send(html);
+       return;
     }
 
    // hash the inserted password
-    var hashedPassword = await bcrypt.hash(password, saltRounds);
+   var hashedPassword = await bcrypt.hash(password, saltRounds);
 
     // add the new user to collection of users in database
 	await userCollection.insertOne({username: username, email: email, password: hashedPassword});
@@ -245,8 +245,16 @@ app.get('/members', (req,res) => {
         // local variable to hold username of current session
         var username = req.session.username;
 
+        // array of picture filenames
+        var pictures = ['C6-GIF.gif', 'C7-GIF.webp', 'C8-GIF.webp'];
+
+        // get a random index from the pictures array
+        var randomIndex = Math.floor(Math.random() * pictures.length);
+
         var html = `
-        <h2> Hello ${username}! </h2>`
+        <h2> Hello ${username}! </h2>
+        <img src='/${pictures[randomIndex]}' alt="Random picture"><br>
+        <a href='/logout'><button> Logout </button></a>`;
         res.send(html);
 
 });
@@ -260,38 +268,6 @@ app.get('/logout', (req, res) => {
     res.redirect('/');
 });
 
-
-// about page
-app.get('/about', (req,res) => {
-
-    // variable to hold the queried color
-    var color = req.query.color;
-
-    res.send("<h1 style='color:"+color+";'>Gursidh Sandhu</h1>");
-});
-
-// cars page
-app.get('/car/:id', (req,res) => {
-
-    // create car variable to hold in queried id
-    var car = req.params.id;
-
-    // display certain car based on id
-
-    if(car == 1){
-        res.send("<img src='/C6-GIF.gif' style='width:1400px;'>");
-    }
-    else if(car == 2){
-        res.send("<img src='/C7-GIF.webp' style='width:1400px;'>");
-    } 
-    else if(car == 3){
-        res.send("<img src='/C8-GIF.webp' style='width:1400px;'>");
-    } 
-    else {
-        res.send("Invalid car ID");
-    }
-});
-
 // using the direct path of public folder
 app.use(express.static(__dirname + "/public"));
 
@@ -301,4 +277,7 @@ app.get("*", (req,res) => {
     res.send("Page is not found or does not exist - 404");
 });
     
+app.listen(port, () => {
+    console.log("Node application listening on port " + port);
+});
 
