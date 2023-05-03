@@ -41,7 +41,6 @@ const node_session_secret = process.env.NODE_SESSION_SECRET;
 // import the database object from databaseConnection.js file
 var {database} = include('databaseConnection');
 
-
 // reference to users collection in database
 const userCollection = database.db(mongodb_database).collection('users');
 
@@ -61,8 +60,6 @@ app.use(session({
     resave: true
 }
 ));
-
-var users = [];
 
 // creating a home page for users to either click login or signup
 app.get('/', (req,res) => {
@@ -157,11 +154,12 @@ app.post('/loginSubmit', async(req,res) => {
 		return;
 	}
     // if email found then compare the given password to stored password
-    // if passwords match then redirect user to members page
+    // if passwords match then redirect user to members page and start valid session
 	if (await bcrypt.compare(password, result[0].password)) {
 
 		req.session.authenticated = true;
 		req.session.email = email;
+        req.session.username = result[0].username;
 		req.session.cookie.maxAge = expireTime;
 
 		res.redirect('/members');
@@ -207,26 +205,26 @@ app.post('/signupSubmit', async(req,res) => {
 
 	 const validationResult = schema.validate({username, email, password});
 
+
     // if validation throws an error then redirect user to signup page
-	if (validationResult.error != null) {
+	 if (validationResult.error != null) {
 	   var error = validationResult.error;
        var html = `
        <h1> ${error} </h1>
        <a href='/signup'><h2> Try again </h2></a>`;
        res.send(html);
 	   return;
-   }
+   } 
+       // check if email already exists in the user collection
+       var existingUser = await userCollection.findOne({ email: email });
 
-    // check if email already exists in the user collection
-    var existingUser = await userCollection.findOne({ email: email });
-
-    if (existingUser) {
+   if (existingUser) {
        var html = `
            <h1> This email already exists. </h1>
            <a href='/signup'><h2> Try again </h2></a>`;
        res.send(html);
        return;
-    }
+    } 
 
    // hash the inserted password
    var hashedPassword = await bcrypt.hash(password, saltRounds);
@@ -234,14 +232,20 @@ app.post('/signupSubmit', async(req,res) => {
     // add the new user to collection of users in database
 	await userCollection.insertOne({username: username, email: email, password: hashedPassword});
 
-   // redirect to members page if passes validation code
-   res.redirect('/members');
+    // if passes validation code, begin session and redirect to members page
+    req.session.authenticated = true;
+    req.session.cookie.maxAge = expireTime;
+    req.session.username = username;
+    res.redirect('/members');
+    
 
 });
 
 // members area page
 app.get('/members', (req,res) => {
 
+    // check if current session is valid
+    if(req.session.authenticated){
         // local variable to hold username of current session
         var username = req.session.username;
 
@@ -256,6 +260,9 @@ app.get('/members', (req,res) => {
         <img src='/${pictures[randomIndex]}' alt="Random picture"><br>
         <a href='/logout'><button> Logout </button></a>`;
         res.send(html);
+    }else{
+        res.redirect('/');
+    }
 
 });
 
@@ -263,7 +270,6 @@ app.get('/members', (req,res) => {
 app.get('/logout', (req, res) => {
     // destroy current session
     req.session.destroy();
-
     // redirect to home page
     res.redirect('/');
 });
