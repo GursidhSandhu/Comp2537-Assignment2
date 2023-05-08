@@ -1,0 +1,8 @@
+<li>
+  <%= user.username %>: <%= user.user_type%>
+    <% if (user.user_type == 'admin') { %>
+      <a href='/changeToUser/<%= user.username %>'><button class="btn btn-danger rounded-pill px-3" type="button">Demote to User</button></a>
+    <% } else { %>
+      <a href='/changeToAdmin/<%= user.username %>'><button class="btn btn-success rounded-pill px-3" type="button">Promote to Admin</button></a>
+    <% } %>
+</li>
